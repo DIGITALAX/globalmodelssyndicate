@@ -118,7 +118,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider
           customTheme={{
-            "--ck-font-family": '"Nerd Semi", cursive',
+            "--ck-font-family": '"Hidayatullah", cursive',
           }}
         >
           <ModalContext.Provider

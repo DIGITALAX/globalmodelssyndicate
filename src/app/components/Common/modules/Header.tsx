@@ -112,7 +112,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute left-[15%] top-[15%] w-44 h-32 sm:w-56 sm:h-40 rotate-[8deg]">
+            <div className="absolute left-[15%] top-[15%] w-44 h-32 sm:w-56 sm:h-40 rotate-[8deg] hidden lg:block">
               <div className="relative w-full h-full wheatpaste-texture collage-texture">
                 <Image
                   src="/images/globalmodelssyndicate-pose-camera.png"
@@ -124,7 +124,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute right-[35%] top-[18%] w-36 h-52 sm:w-44 sm:h-64 rotate-[-6deg]">
+            <div className="absolute right-[35%] top-[18%] w-36 h-52 sm:w-44 sm:h-64 rotate-[-6deg] hidden md:block">
               <div className="relative w-full h-full wheatpaste-texture collage-texture">
                 <Image
                   src="/images/digitalax-globalmodelssyndicate-backstage-shot.png"
@@ -136,7 +136,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute left-[48%] top-[55%] w-48 h-32 sm:w-60 sm:h-40 rotate-[2deg]">
+            <div className="absolute left-[48%] top-[55%] w-48 h-32 sm:w-60 sm:h-40 rotate-[2deg] hidden md:block">
               <div className="relative w-full h-full wheatpaste-texture collage-texture">
                 <Image
                   src="/images/digitalax-globalmodelssyndicate-getting-ready-backstage.png"
@@ -148,7 +148,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute right-[4%] top-[8%] w-40 h-28 sm:w-52 sm:h-36 rotate-[14deg]">
+            <div className="absolute right-[4%] top-[8%] w-40 h-28 sm:w-52 sm:h-36 rotate-[14deg] hidden lg:block">
               <div className="relative w-full h-full collage-texture">
                 <Image
                   src="/images/digitalax-globalmodelssyndicate-midnight-backstage.png"
@@ -160,7 +160,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute left-[30%] top-[25%] w-40 h-52 sm:w-52 sm:h-60 rotate-[-2deg]">
+            <div className="absolute left-[30%] top-[25%] w-40 h-52 sm:w-52 sm:h-60 rotate-[-2deg] hidden lg:block">
               <div className="relative w-full wheatpaste-texture h-full collage-texture">
                 <Image
                   src="/images/digitalax-globalmodelssyndicate-photograph-backstage.png"
@@ -172,7 +172,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute left-[5%] bottom-[12%] w-40 h-56 sm:w-52 sm:h-72 rotate-[10deg]">
+            <div className="absolute left-[5%] bottom-[12%] w-40 h-56 sm:w-52 sm:h-72 rotate-[10deg] hidden lg:block">
               <div className="relative w-full wheatpaste-texture h-full collage-texture">
                 <Image
                   src="/images/digitalax-globalmodelssyndicate-modelling.png"
@@ -184,7 +184,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute right-[30%] bottom-[6%] w-44 h-32 sm:w-56 sm:h-40 rotate-[6deg]">
+            <div className="absolute right-[30%] bottom-[6%] w-44 h-32 sm:w-56 sm:h-40 rotate-[6deg] hidden lg:block">
               <div className="relative w-full wheatpaste-texture h-full collage-texture">
                 <Image
                   src="/images/globalmodelssyndicate-pose-backstage.png"
@@ -196,7 +196,7 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
                 />
               </div>
             </div>
-            <div className="absolute left-[63%] bottom-[25%] w-44 h-32 sm:w-56 sm:h-40 rotate-[-14deg]">
+            <div className="absolute left-[63%] bottom-[25%] w-44 h-32 sm:w-56 sm:h-40 rotate-[-14deg] hidden lg:block">
               <div className="relative w-full wheatpaste-texture h-full collage-texture">
                 <Image
                   src="/images/globalmodelssyndicate-headphone-session.png"
