@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://gms.globaldesignernetwork.com/sitemap.xml
