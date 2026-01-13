@@ -38,12 +38,12 @@ const Success = ({ dict }: { dict: any }) => {
                   href={explorerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-mono text-blue-600 hover:underline break-all"
+                  className="text-xs font-back text-blue-600 hover:underline break-all"
                 >
                   {context.successData.txHash}
                 </a>
               ) : (
-                <p className="text-xs font-mono text-gray-600 break-all">
+                <p className="text-xs font-back text-gray-600 break-all">
                   {context.successData.txHash}
                 </p>
               )}

@@ -6,7 +6,7 @@ import { chains } from "@lens-chain/sdk/viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorData, SuccessData } from "./components/Modals/types/modals.types";
 import { getCurrentNetwork } from "./lib/constants";
-import { Collection } from "./components/Common/types/common.types";
+import { Collection } from "./components/Model/types/model.types";
 
 const queryClient = new QueryClient();
 const currentNetwork = getCurrentNetwork();

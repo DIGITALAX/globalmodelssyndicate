@@ -34,7 +34,7 @@ export const Forum: FunctionComponent<{ dict: any }> = ({ dict }) => {
       </div>
       <div className="relative w-full h-8 flex">
         <video autoPlay loop muted className="w-full h-full object-cover">
-          <source src="/videos/chica_gdn.mp4" />
+          <source src="/videos/digitalax-globalmodelssyndicate-stitch.mp4" />
         </video>
       </div>
       <div className="relative w-full h-fit flex flex-col gap-2 px-6">

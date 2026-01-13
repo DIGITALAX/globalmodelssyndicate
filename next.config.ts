@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
     const allowedOrigins = [
       "https://thedial.infura-ipfs.io",
       "https://globaldesignernetwork.com",
+      "https://gms.globaldesignernetwork.com",
       "https://gw.ipfs-lens.dev",
     ];
     allowedOrigins.forEach((origin) => {

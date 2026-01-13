@@ -10,40 +10,45 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
   const router = useRouter();
   const path = usePathname();
   const context = useContext(ModalContext);
-  const isCompactHeader =
-    path?.includes("market") ||
-    path?.includes("collection") ||
-    path?.includes("model") ||
-    path?.includes("account");
+  const isHomePage = !path || /^\/(en|es|pt)?\/?$/.test(path);
+  const isCompactHeader = !isHomePage;
 
   return (
-    <div className="relative w-full h-fit flex flex-col">
+    <div className="relative w-full h-auto flex flex-col">
       <div
-        className={`relative w-full flex ${
+        className={`relative w-full isolate ${
           isCompactHeader
-            ? "h-20"
-            : "h-[50rem] lg:h-[40rem] lg:h-screen diagonal-layout"
+            ? "h-auto overflow-hidden"
+            : "flex h-[50rem] lg:h-[40rem] lg:h-screen diagonal-layout"
         }`}
       >
-        <video
-          draggable={false}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full absolute wheatpaste-texture top-0 left-0 h-full object-cover"
-          poster="/images/fondo.png"
-        >
-          <source src="/videos/fondo.mp4" />
-        </video>
+        <div className="absolute inset-0 wheatpaste-texture w-full h-full flex pointer-events-none z-0">
+          <video
+            draggable={false}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            poster="/images/fondo.png"
+          >
+            <source src="/videos/fondo.mp4" />
+          </video>
+        </div>
         <button
           onClick={() => context?.setCartOpen(true)}
           className="absolute z-60 top-2 left-0 bg-yellow-500 hover:bg-yellow-600 text-black px-3 py-2 text-sm font-bold transition-colors"
         >
           ({context?.cartItems.length || 0})
         </button>
-        <div className="relative bg-yellow-500 hover:bg-yellow-600 w-12 px-3 py-2"></div>
-        <div className="absolute inset-0 w-full h-full wheatpaste-overlay pointer-events-none z-0" />
+        <div
+          className={`${
+            isCompactHeader
+              ? "w-4 sm:w-6"
+              : "w-12"
+          } absolute top-0 right-0 h-full  bg-yellow-500 hover:bg-yellow-600`}
+        ></div>
+        <div className="absolute inset-0 w-full h-full wheatpaste-overlay pointer-events-none z-10" />
         {!isCompactHeader && (
           <div className="absolute inset-x-0 top-24 bottom-24 w-full overflow-hidden pointer-events-none z-0">
             <div className="absolute -left-6 top-6 w-40 h-56 sm:w-52 sm:h-72 rotate-[-10deg]">
@@ -210,71 +215,95 @@ const Header: FunctionComponent<HeaderProps> = ({ dict }) => {
             </div>
           </div>
         )}
-        <div className="absolute top-0 left-0 flex w-full h-fit text-center items-center justify-center text-[5vw] font-hid z-50 bg-transparent">
-          GLOBAL MODELS SYNDICATE
-        </div>
-        <div className="absolute bottom-0 left-0 flex w-full h-fit px-4 py-3 items-center justify-between z-10 bg-transparent">
-          <div className="relative w-full h-fit flex flex-row gap-6 flex-wrap items-center justify-between">
-            {[
-              { titulo: dict?.account, ref: "/account", pathMatch: "account" },
-              {
-                titulo: dict?.models,
-                ref: "/indie-models",
-                pathMatch: "indie-models",
-              },
-              { titulo: dict?.market, ref: "/market", pathMatch: "market" },
-              {
-                titulo: dict?.realm,
-                ref: path?.includes("/es/")
-                  ? "https://runway.globaldesignernetwork.com/es/"
-                  : path.includes("/pt/")
-                  ? "https://runway.globaldesignernetwork.com/pt/"
-                  : "https://runway.globaldesignernetwork.com/",
-                pathMatch: "",
-              },
-              {
-                titulo: dict?.for,
-                ref: "https://cc0web3fashion.com/forum/",
-                pathMatch: "",
-              },
-            ].map((item, i) => {
-              const isOnThisPage =
-                item.pathMatch && path?.includes(item.pathMatch);
-              const isHomePage =
-                path === "/" ||
-                path === "/en" ||
-                path === "/es" ||
-                path === "/pt";
+        <div
+          className={`${
+            isCompactHeader
+              ? "relative z-20 w-full h-auto flex flex-col gap-2 px-12 sm:px-16 pt-2 pb-4"
+              : ""
+          }`}
+        >
+          <div
+            className={`${
+              isCompactHeader ? "relative" : "absolute"
+            } top-0 left-0 flex w-full h-fit text-center items-center justify-center text-[5vw] font-hid z-50 bg-transparent ${
+              isCompactHeader ? "pt-2" : ""
+            }`}
+          >
+            GLOBAL MODELS SYNDICATE
+          </div>
+          <div
+            className={`${
+              isCompactHeader ? "relative" : "absolute"
+            } bottom-0 left-0 flex w-full h-fit px-4 py-3 items-center justify-between z-10 bg-transparent ${
+              isCompactHeader ? "" : ""
+            }`}
+          >
+            <div className="relative w-full h-fit flex flex-row gap-6 flex-wrap items-center justify-between">
+              {[
+                {
+                  titulo: dict?.account,
+                  ref: "/account",
+                  pathMatch: "account",
+                },
+                {
+                  titulo: dict?.models,
+                  ref: "/indie-models",
+                  pathMatch: "indie-models",
+                },
+                { titulo: dict?.market, ref: "/market", pathMatch: "market" },
+                {
+                  titulo: dict?.realm,
+                  ref: path?.includes("/es/")
+                    ? "https://runway.globaldesignernetwork.com/es/"
+                    : path.includes("/pt/")
+                    ? "https://runway.globaldesignernetwork.com/pt/"
+                    : "https://runway.globaldesignernetwork.com/",
+                  pathMatch: "",
+                },
+                {
+                  titulo: dict?.for,
+                  ref: "https://cc0web3fashion.com/forum/",
+                  pathMatch: "",
+                },
+              ].map((item, i) => {
+                const isOnThisPage =
+                  item.pathMatch && path?.includes(item.pathMatch);
+                const isHomePage =
+                  path === "/" ||
+                  path === "/en" ||
+                  path === "/es" ||
+                  path === "/pt";
 
-              return (
-                <div
-                  key={i}
-                  onClick={() => {
-                    if (item.ref.startsWith("/")) {
-                      const lang = path.split("/")[1];
-                      if (isOnThisPage) {
-                        if (lang === "en" || lang === "es" || lang === "pt") {
-                          router.push(`/${lang}`);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (item.ref.startsWith("/")) {
+                        const lang = path.split("/")[1];
+                        if (isOnThisPage) {
+                          if (lang === "en" || lang === "es" || lang === "pt") {
+                            router.push(`/${lang}`);
+                          } else {
+                            router.push("/");
+                          }
                         } else {
-                          router.push("/");
+                          if (lang === "en" || lang === "es" || lang === "pt") {
+                            router.push(`/${lang}${item.ref}`);
+                          } else {
+                            router.push(item.ref);
+                          }
                         }
                       } else {
-                        if (lang === "en" || lang === "es" || lang === "pt") {
-                          router.push(`/${lang}${item.ref}`);
-                        } else {
-                          router.push(item.ref);
-                        }
+                        window.open(item.ref);
                       }
-                    } else {
-                      window.open(item.ref);
-                    }
-                  }}
-                  className="relative w-fit text-xxs text-black uppercase h-fit flex flex-row cursor-pointer hover:underline bg-yellow-300 px-2 py-1"
-                >
-                  {isOnThisPage && !isHomePage ? dict?.mainPort : item.titulo}
-                </div>
-              );
-            })}
+                    }}
+                    className="relative w-fit text-xxs text-black uppercase h-fit flex flex-row cursor-pointer hover:underline bg-yellow-300 px-2 py-1"
+                  >
+                    {isOnThisPage && !isHomePage ? dict?.mainPort : item.titulo}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
