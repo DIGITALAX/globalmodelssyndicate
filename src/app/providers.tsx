@@ -1,6 +1,6 @@
 "use client";
 import { createContext, SetStateAction, useState } from "react";
-import { WagmiProvider, createConfig, http } from "wagmi";
+import { WagmiProvider, createConfig, http, injected } from "wagmi";
 import { metaMask } from "wagmi/connectors";
 import { ConnectKitProvider } from "connectkit";
 import { chains } from "@lens-chain/sdk/viem";
@@ -38,7 +38,7 @@ export const ModalContext = createContext<
 
 export const config = createConfig({
   chains: [chains.mainnet],
-  connectors: [metaMask()],
+  connectors: [injected({ target: "metaMask" })],
   transports: {
     [currentNetwork.chainId]: http(),
   },
