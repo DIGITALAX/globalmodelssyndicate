@@ -4,9 +4,9 @@ import {
 } from "../components/Common/types/common.types";
 
 export const LOCALES: string[] = ["en", "es", "pt"];
-export const INFURA_GATEWAY: string = "https://thedial.infura-ipfs.io";
+export const INFURA_GATEWAY: string = "https://cdn.digitalax.xyz";
 export const INFURA_GATEWAY_INTERNAL: string =
-  "https://globaldesignernetwork.com/api/infura/";
+  "https://cdn.digitalax.xyz/ipfs/";
 
 export const NETWORKS = {
   LENS_TESTNET: {

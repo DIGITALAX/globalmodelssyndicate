@@ -48,7 +48,7 @@ export async function generateMetadata({
       images: modelData.metadata?.image
         ? [
             {
-              url: `https://thedial.infura-ipfs.io/ipfs/${modelData.metadata.image}`,
+              url: `https://cdn.digitalax.xyz/ipfs/${modelData.metadata.image}`,
               width: 1200,
               height: 630,
               alt: modelData.metadata.title || "Model",
@@ -62,7 +62,7 @@ export async function generateMetadata({
       title,
       description,
       images: modelData.metadata?.image
-        ? [`https://thedial.infura-ipfs.io/ipfs/${modelData.metadata.image}`]
+        ? [`https://cdn.digitalax.xyz/ipfs/${modelData.metadata.image}`]
         : [],
     },
   };

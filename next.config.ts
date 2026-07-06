@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "thedial.infura-ipfs.io",
+        hostname: "cdn.digitalax.xyz",
         pathname: "/ipfs/**",
       },
       {
@@ -24,8 +24,8 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "globaldesignernetwork.com",
-        pathname: "/api/infura/**",
+        hostname: "cdn.digitalax.xyz",
+        pathname: "/ipfs/**",
       },
     ],
     unoptimized: true,
@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
     let headersConfig: any = [];
 
     const allowedOrigins = [
-      "https://thedial.infura-ipfs.io",
+      "https://cdn.digitalax.xyz",
       "https://globaldesignernetwork.com",
       "https://gms.globaldesignernetwork.com",
       "https://gw.ipfs-lens.dev",
