@@ -6,6 +6,7 @@ import Image from "next/image";
 import { CreateTabProps } from "../types/account.types";
 import { INFURA_GATEWAY } from "@/app/lib/constants";
 import { Collection, Drop } from "../../Model/types/model.types";
+import DesignerSelect from "./DesignerSelect";
 
 const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
   const {
@@ -25,6 +26,8 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
     setCollection,
     collections,
     setCollections,
+    designers,
+    designersLoading,
   } = useCreate(model, dict);
 
   const [activeSection, setActiveSection] = useState<
@@ -74,10 +77,14 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
       collection?.metadata?.description &&
       collection?.metadata?.media &&
       collection?.amount > 0 &&
-      collection?.price > 0
+      Number(collection?.price) > 0 &&
+      (collection?.designerIds?.length ?? 0) > 0
     ) {
       setCollections([...collections, collection]);
       setCollection(undefined);
+      if (collectionMediaRef.current) {
+        collectionMediaRef.current.value = "";
+      }
       if (addCollectionMediaRef.current) {
         addCollectionMediaRef.current.value = "";
       }
@@ -238,11 +245,13 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
                     </label>
                     <input
                       type="number"
+                      step="0.01"
+                      min="0"
                       value={collection?.price || ""}
                       onChange={(e) =>
                         setCollection({
                           ...collection!,
-                          price: Number(e.target.value),
+                          price: e.target.value,
                         })
                       }
                       className="w-full p-2 border border-black text-sm"
@@ -312,6 +321,19 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
                   />
                 </div>
 
+                <DesignerSelect
+                  dict={dict}
+                  designers={designers}
+                  designersLoading={designersLoading}
+                  selected={collection?.designerIds ?? []}
+                  onChange={(designerIds) =>
+                    setCollection({
+                      ...collection!,
+                      designerIds,
+                    })
+                  }
+                />
+
                 <button
                   onClick={handleAddCollectionToList}
                   className="bg-blue-600 text-white px-4 py-2 text-sm hover:bg-blue-700 transition-colors"
@@ -332,7 +354,8 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
                     >
                       <span>
                         {col?.metadata.title} - {col?.amount} {dict?.items} @{" "}
-                        {col?.price} MONA
+                        {col?.price} MONA [
+                        {col?.designerIds?.map((id) => `#${id}`).join(", ")}]
                       </span>
                       <button
                         onClick={() => handleRemoveFromList(index)}
@@ -497,17 +520,31 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
                     <input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={collection?.price || ""}
                       onChange={(e) =>
                         setCollection({
                           ...collection!,
-                          price: Number(e.target.value),
+                          price: e.target.value,
                         })
                       }
                       className="w-full p-3 border-2 border-black"
                     />
                   </div>
                 </div>
+
+                <DesignerSelect
+                  dict={dict}
+                  designers={designers}
+                  designersLoading={designersLoading}
+                  selected={collection?.designerIds ?? []}
+                  onChange={(designerIds) =>
+                    setCollection({
+                      ...collection!,
+                      designerIds,
+                    })
+                  }
+                />
               </div>
 
               <div className="space-y-4">
@@ -634,7 +671,8 @@ const CreateTab: FunctionComponent<CreateTabProps> = ({ dict, model }) => {
                   !collection?.metadata?.description ||
                   !collection?.metadata?.media ||
                   !collection?.amount ||
-                  !collection?.price
+                  !collection?.price ||
+                  !collection?.designerIds?.length
                 }
                 className="bg-black text-white px-6 py-3 hover:bg-gray-800 transition-colors disabled:opacity-50"
               >

@@ -1,4 +1,39 @@
-import { Collection, Model } from "../../Model/types/model.types";
+import { Collection, Designer, Model } from "../../Model/types/model.types";
+
+export interface CollectionDraft {
+  amount: number;
+  price: string;
+  designerIds: string[];
+  metadata: {
+    title: string;
+    description: string;
+    media: File;
+    model: string;
+    prompt: string;
+    workflow: string;
+  };
+}
+
+export interface DropDraft {
+  title: string;
+  description: string;
+  image: File;
+}
+
+export interface CreateCollectionParams {
+  edition: bigint;
+  price: bigint;
+  uri: string;
+  designerIds: bigint[];
+}
+
+export type DesignerSelectProps = {
+  dict: any;
+  designers: Designer[];
+  designersLoading: boolean;
+  selected: string[];
+  onChange: (designerIds: string[]) => void;
+};
 
 export interface Purchase {
   id: string;

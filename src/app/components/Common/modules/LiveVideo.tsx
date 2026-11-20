@@ -17,6 +17,7 @@ const LiveVideo: FunctionComponent<{ dict: any }> = ({ dict }) => {
               href="https://lucidity.agentmeme.xyz/"
               className="cursor-pointer underline"
               target="_blank"
+              rel="noopener noreferrer"
             >
               {dict?.liveVideoBodyLink}
             </a>

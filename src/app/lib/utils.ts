@@ -14,7 +14,7 @@ export const fetchMetadataFromIPFS = async (uri: string): Promise<any> => {
 
     if (uri?.startsWith("ipfs://")) {
       metadataUrl = `${INFURA_GATEWAY}/ipfs/${uri.split("ipfs://")[1]}`;
-    } else if (!uri?.startsWith("http://") && !uri?.startsWith("https://")) {
+    } else if (!uri?.startsWith("https://")) {
       return null;
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useState } from "react";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { CartItem, ModalContext } from "@/app/providers";
 import { Collection } from "../../Model/types/model.types";
 import {
@@ -9,12 +9,58 @@ import {
   getCurrentNetwork,
 } from "@/app/lib/constants";
 import { ABIS } from "@/app/abis";
+import useLensChain from "../../Common/hooks/useLensChain";
+
+const ERC20_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address", internalType: "address" },
+      { name: "value", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address", internalType: "address" },
+      { name: "spender", type: "address", internalType: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
+const toWei = (value: string | undefined | null): bigint => {
+  const text = String(value ?? "").trim();
+  if (!/^\d+$/.test(text)) {
+    throw new Error("Invalid price");
+  }
+  return BigInt(text);
+};
+
+const toCount = (value: number): bigint => {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("Invalid amount");
+  }
+  return BigInt(value);
+};
 
 const usePurchase = (dict: any, collection?: Collection | undefined) => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const context = useContext(ModalContext);
-  const { data: walletClient } = useWalletClient();
+  const { ensureLensWallet } = useLensChain();
   const [purchaseLoading, setPurchaseLoading] = useState<boolean>(false);
   const [approveLoading, setApproveLoading] = useState<boolean>(false);
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
@@ -28,17 +74,7 @@ const usePurchase = (dict: any, collection?: Collection | undefined) => {
     try {
       const balance = await publicClient.readContract({
         address: contracts.mona,
-        abi: [
-          {
-            type: "function",
-            name: "balanceOf",
-            inputs: [
-              { name: "account", type: "address", internalType: "address" },
-            ],
-            outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-            stateMutability: "view",
-          },
-        ],
+        abi: ERC20_ABI,
         functionName: "balanceOf",
         args: [address],
       });
@@ -54,8 +90,18 @@ const usePurchase = (dict: any, collection?: Collection | undefined) => {
     }
   };
 
+  const readAllowance = async (): Promise<bigint> => {
+    if (!address || !publicClient) return BigInt(0);
+    return await publicClient.readContract({
+      address: contracts.mona,
+      abi: ERC20_ABI,
+      functionName: "allowance",
+      args: [address, contracts.market],
+    });
+  };
+
   const handlePurchase = async () => {
-    if (!walletClient || !address || !publicClient || !collection) return;
+    if (!address || !publicClient || !collection) return;
     setPurchaseLoading(true);
     try {
       if (collection?.tokenIds?.length == Number(collection?.edition)) {
@@ -64,21 +110,32 @@ const usePurchase = (dict: any, collection?: Collection | undefined) => {
         return;
       }
 
-      const requiredAmount = parseFloat(collection.price) * purchaseAmount;
+      const count = toCount(purchaseAmount);
+      const requiredAmount = toWei(collection.price) * count;
 
-      const hasBalance = await checkBalance(BigInt(requiredAmount));
+      const hasBalance = await checkBalance(requiredAmount);
       if (!hasBalance) {
         setPurchaseLoading(false);
         return;
       }
 
-      const hash = await walletClient.writeContract({
+      const allowance = await readAllowance();
+      if (allowance < requiredAmount) {
+        setApproved(false);
+        context?.showError(dict?.requiresMonaApproval);
+        setPurchaseLoading(false);
+        return;
+      }
+
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.market,
         abi: ABIS.GMSMarket,
         functionName: "buy",
-        args: [BigInt(collection.collectionId), BigInt(purchaseAmount), ""],
+        args: [BigInt(collection.collectionId), count, ""],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       setPurchaseAmount(1);
       await checkApproved();
@@ -90,79 +147,65 @@ const usePurchase = (dict: any, collection?: Collection | undefined) => {
     setPurchaseLoading(false);
   };
 
-  const handleApprove = async (amount: bigint) => {
-    if (!walletClient || !address || !publicClient) return;
+  const handleApprove = async (amount: bigint): Promise<boolean> => {
+    if (!address || !publicClient || amount <= BigInt(0)) return false;
     setApproveLoading(true);
+    let success = false;
     try {
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.mona,
-        abi: [
-          {
-            type: "function",
-            name: "approve",
-            inputs: [
-              { name: "spender", type: "address", internalType: "address" },
-              { name: "value", type: "uint256", internalType: "uint256" },
-            ],
-            outputs: [{ name: "", type: "bool", internalType: "bool" }],
-            stateMutability: "nonpayable",
-          },
-        ],
+        abi: ERC20_ABI,
         functionName: "approve",
         args: [contracts.market, amount],
         account: address,
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await wallet.writeContract(request);
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        throw new Error("Approval reverted");
+      }
+      const allowance = await readAllowance();
+      if (allowance < amount) {
+        throw new Error("Allowance below required amount");
+      }
+      success = true;
       setApproved(true);
       context?.showSuccess(dict?.approveSuccess, hash);
     } catch (err: any) {
-      setApproveLoading(false);
       console.error(err.message);
       context?.showError(dict?.approveError);
     }
     setApproveLoading(false);
+    return success;
   };
 
   const checkApproved = async () => {
     if (!address || !publicClient || !collection) return;
     try {
-      const data = await publicClient?.readContract({
-        address: contracts.mona,
-        abi: [
-          {
-            type: "function",
-            name: "allowance",
-            inputs: [
-              { name: "owner", type: "address", internalType: "address" },
-              { name: "spender", type: "address", internalType: "address" },
-            ],
-            outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-            stateMutability: "view",
-          },
-        ],
-        functionName: "allowance",
-        args: [address, contracts.market],
-        account: address,
-      });
-      if (Number(data) >= Number(collection.price) * purchaseAmount) {
-        setApproved(true);
-      } else {
-        setApproved(false);
-      }
+      const allowance = await readAllowance();
+      const requiredAmount = toWei(collection.price) * toCount(purchaseAmount);
+      setApproved(allowance >= requiredAmount);
     } catch (err: any) {
       console.error(err.message);
     }
   };
 
   useEffect(() => {
-    if (!approved && address && publicClient && collection) {
+    if (address && publicClient && collection) {
       checkApproved();
     }
   }, [address, publicClient, collection, purchaseAmount]);
 
   const handleApproveFlow = async () => {
-    const totalAmount = parseFloat(collection?.price || "0") * purchaseAmount;
-    await handleApprove(BigInt(totalAmount));
+    if (!collection) return;
+    try {
+      const totalAmount = toWei(collection.price) * toCount(purchaseAmount);
+      await handleApprove(totalAmount);
+    } catch (err: any) {
+      console.error(err.message);
+      context?.showError(dict?.approveError);
+    }
   };
 
   const handlePurchaseFlow = async () => {
@@ -174,36 +217,45 @@ const usePurchase = (dict: any, collection?: Collection | undefined) => {
   };
 
   const handleBuyBatch = async (cartItems: CartItem[]) => {
-    if (!walletClient || !address || !publicClient || cartItems.length === 0)
-      return;
+    if (!address || !publicClient || cartItems.length === 0) return;
     setBatchLoading(true);
     try {
       const collectionIds = cartItems.map((item) =>
-        Number(item.collection.collectionId)
+        BigInt(item.collection.collectionId)
       );
-      const amounts = cartItems.map((item) => item.amount);
+      const amounts = cartItems.map((item) => toCount(item.amount));
       const fulfillments = Array.from({ length: amounts.length }, () => "");
 
       const totalAmount = cartItems.reduce(
-        (sum, item) => sum + parseFloat(item.collection.price) * item.amount,
-        0
+        (sum, item, index) =>
+          sum + toWei(item.collection.price) * amounts[index],
+        BigInt(0)
       );
 
-      const hasBalance = await checkBalance(BigInt(totalAmount));
+      const hasBalance = await checkBalance(totalAmount);
       if (!hasBalance) {
         setBatchLoading(false);
         return;
       }
 
-      await handleApprove(BigInt(totalAmount));
+      const allowance = await readAllowance();
+      if (allowance < totalAmount) {
+        const approvedNow = await handleApprove(totalAmount);
+        if (!approvedNow) {
+          setBatchLoading(false);
+          return;
+        }
+      }
 
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.market,
         abi: ABIS.GMSMarket,
         functionName: "buyBatch",
         args: [collectionIds, amounts, fulfillments],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.batchPurchaseSuccess, hash);
     } catch (err: any) {

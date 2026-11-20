@@ -1,15 +1,41 @@
-import { useContext, useState } from "react";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useContext, useEffect, useState } from "react";
+import { useAccount, usePublicClient } from "wagmi";
+import { parseUnits } from "viem";
 import { ModalContext } from "@/app/providers";
-import { Collection, Model } from "../../Model/types/model.types";
-import { getCoreContractAddresses, getCurrentNetwork } from "@/app/lib/constants";
+import { Collection, Designer, Model } from "../../Model/types/model.types";
+import {
+  getCoreContractAddresses,
+  getCurrentNetwork,
+  MAX_COLLECTION_DESIGNERS,
+  MONA_DECIMALS,
+} from "@/app/lib/constants";
 import { ABIS } from "@/app/abis";
+import uploadIpfs from "@/app/lib/helpers/uploadIpfs";
+import useLensChain from "../../Common/hooks/useLensChain";
+import { getDesignersPaginated } from "../../../../../graphql/gdn/getDesigners";
+import {
+  CollectionDraft,
+  CreateCollectionParams,
+  DropDraft,
+} from "../types/account.types";
+
+const DESIGNER_ADDRESS_ABI = [
+  {
+    type: "function",
+    name: "getDesignerAddress",
+    inputs: [{ name: "designerId", type: "uint256", internalType: "uint256" }],
+    outputs: [{ name: "", type: "address", internalType: "address" }],
+    stateMutability: "view",
+  },
+] as const;
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const useCreate = (model: Model | undefined, dict: any) => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const context = useContext(ModalContext);
-  const { data: walletClient } = useWalletClient();
+  const { ensureLensWallet } = useLensChain();
   const network = getCurrentNetwork();
   const contracts = getCoreContractAddresses(network.chainId);
   const [createDropLoading, setCreateDropLoading] = useState<boolean>(false);
@@ -19,46 +45,132 @@ const useCreate = (model: Model | undefined, dict: any) => {
     useState<number | null>(null);
   const [deleteDropLoading, setDeleteDropLoading] = useState<number | null>(null);
   const [reassignLoading, setReassignLoading] = useState<boolean>(false);
-  const [collection, setCollection] = useState<{
-    amount: number;
-    price: number;
-    metadata: {
-      title: string;
-      description: string;
-      media: File;
-      model: string;
-      prompt: string;
-      workflow: string;
+  const [designers, setDesigners] = useState<Designer[]>([]);
+  const [designersLoading, setDesignersLoading] = useState<boolean>(false);
+  const [collection, setCollection] = useState<CollectionDraft>();
+  const [collections, setCollections] = useState<CollectionDraft[]>([]);
+  const [drop, setDrop] = useState<DropDraft>();
+
+  const loadDesigners = async () => {
+    setDesignersLoading(true);
+    try {
+      const all: Designer[] = [];
+      let skip = 0;
+      while (skip < 1000) {
+        const res: any = await getDesignersPaginated(100, skip);
+        const page: Designer[] = res?.data?.designers ?? [];
+        all.push(...page);
+        if (page.length < 100) break;
+        skip += 100;
+      }
+      setDesigners(all);
+    } catch (err: any) {
+      console.error(err.message);
+    }
+    setDesignersLoading(false);
+  };
+
+  useEffect(() => {
+    loadDesigners();
+  }, []);
+
+  const validateDraft = async (
+    col: CollectionDraft
+  ): Promise<Omit<CreateCollectionParams, "uri"> | undefined> => {
+    if (!publicClient) return undefined;
+
+    if (!Number.isInteger(col.amount) || col.amount <= 0) {
+      context?.showError(dict?.invalidEditionError);
+      return undefined;
+    }
+
+    const rawPrice = String(col.price ?? "").trim();
+    const priceText = rawPrice.startsWith(".") ? `0${rawPrice}` : rawPrice;
+    if (!/^\d+(\.\d{1,18})?$/.test(priceText)) {
+      context?.showError(dict?.invalidPriceError);
+      return undefined;
+    }
+
+    const price = parseUnits(priceText, MONA_DECIMALS);
+    if (price <= BigInt(0)) {
+      context?.showError(dict?.invalidPriceError);
+      return undefined;
+    }
+
+    const ids = Array.from(
+      new Set((col.designerIds ?? []).map((id) => String(id).trim()))
+    );
+
+    if (ids.length === 0) {
+      context?.showError(dict?.selectDesignerError);
+      return undefined;
+    }
+
+    if (
+      ids.length > MAX_COLLECTION_DESIGNERS ||
+      ids.some((id) => !/^\d+$/.test(id) || BigInt(id) <= BigInt(0))
+    ) {
+      context?.showError(dict?.invalidDesignerError);
+      return undefined;
+    }
+
+    const designerIds = ids.map((id) => BigInt(id));
+
+    const wallets = await Promise.all(
+      designerIds.map((id) =>
+        publicClient.readContract({
+          address: contracts.designers,
+          abi: DESIGNER_ADDRESS_ABI,
+          functionName: "getDesignerAddress",
+          args: [id],
+        })
+      )
+    );
+
+    if (wallets.some((wallet) => !wallet || wallet === ZERO_ADDRESS)) {
+      context?.showError(dict?.invalidDesignerError);
+      return undefined;
+    }
+
+    return {
+      edition: BigInt(col.amount),
+      price,
+      designerIds,
     };
-  }>();
-  const [collections, setCollections] = useState<
-    {
-      amount: number;
-      price: number;
-      metadata: {
-        title: string;
-        description: string;
-        media: File;
-        model: string;
-        prompt: string;
-        workflow: string;
-      };
-    }[]
-  >([]);
-  const [drop, setDrop] = useState<{
-    title: string;
-    description: string;
-    image: File;
-  }>();
+  };
+
+  const uploadCollection = async (
+    col: CollectionDraft,
+    validated: Omit<CreateCollectionParams, "uri">
+  ): Promise<CreateCollectionParams> => {
+    const media = await uploadIpfs(col.metadata.media);
+    const uri = await uploadIpfs({
+      title: col.metadata.title,
+      description: col.metadata.description,
+      mediaType: col.metadata.media.type,
+      media,
+      model: col.metadata.model,
+      prompt: col.metadata.prompt,
+      workflow: col.metadata.workflow,
+    });
+
+    return {
+      edition: validated.edition,
+      price: validated.price,
+      uri,
+      designerIds: validated.designerIds,
+    };
+  };
 
   const handleCreateDrop = async () => {
     if (
-      !walletClient ||
       !address ||
       !model ||
       !publicClient ||
       !drop ||
+      !drop.title ||
       drop.title.trim() == "" ||
+      !drop.description ||
       drop.description.trim() == "" ||
       !drop.image
     )
@@ -66,92 +178,46 @@ const useCreate = (model: Model | undefined, dict: any) => {
 
     setCreateDropLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", drop.image as File);
+      const drafts = collections.filter(
+        (col) =>
+          col.amount > 0 &&
+          Number(col.price) > 0 &&
+          col.metadata.title.trim() !== "" &&
+          col.metadata.description.trim() !== "" &&
+          col.metadata.media
+      );
 
-      const responseImage = await fetch("/api/ipfs", {
-        method: "POST",
-        body: formData,
-      });
-
-      const resImage = await responseImage.json();
-
-      const response = await fetch("/api/ipfs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: drop.title,
-          description: drop.description,
-          image: "ipfs://" + resImage.hash,
-        }),
-      });
-
-      const result = await response.json();
-
-      let promisedCollections: {
-        edition: number;
-        price: number;
-        uri: string;
-      }[] = [];
-
-      if (collections.length > 0) {
-        promisedCollections = await Promise.all(
-          collections
-            ?.filter(
-              (col) =>
-                col.amount > 0 &&
-                col.price > 0 &&
-                col.metadata.title.trim() !== "" &&
-                col.metadata.description.trim() !== "" &&
-                col.metadata.media
-            )
-            ?.map(async (col) => {
-              const formData = new FormData();
-              formData.append("file", col.metadata.media as File);
-
-              const responseImage = await fetch("/api/ipfs", {
-                method: "POST",
-                body: formData,
-              });
-
-              const resImage = await responseImage.json();
-
-              const response = await fetch("/api/ipfs", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  title: col.metadata.title,
-                  description: col.metadata.description,
-                  mediaType: col.metadata.media.type,
-                  media: "ipfs://" + resImage.hash,
-                  model: col.metadata.model,
-                  prompt: col.metadata.prompt,
-                  workflow: col.metadata.workflow,
-                }),
-              });
-
-              const result = await response.json();
-
-              return {
-                edition: col.amount,
-                price: col.price * 10 ** 18,
-                uri: "ipfs://" + result.hash,
-              };
-            })
-        );
+      const validated: Omit<CreateCollectionParams, "uri">[] = [];
+      for (const col of drafts) {
+        const result = await validateDraft(col);
+        if (!result) {
+          setCreateDropLoading(false);
+          return;
+        }
+        validated.push(result);
       }
 
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+
+      const image = await uploadIpfs(drop.image);
+      const dropUri = await uploadIpfs({
+        title: drop.title,
+        description: drop.description,
+        image,
+      });
+
+      const params: CreateCollectionParams[] = await Promise.all(
+        drafts.map((col, index) => uploadCollection(col, validated[index]))
+      );
+
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "createDrop",
-        args: ["ipfs://" + result.hash, promisedCollections],
+        args: [dropUri, params],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.createDropSuccess, hash);
       setDrop(undefined);
@@ -165,12 +231,13 @@ const useCreate = (model: Model | undefined, dict: any) => {
 
   const handleAddCollection = async (dropId: number) => {
     if (
-      !walletClient ||
       !address ||
       !model ||
       !publicClient ||
       !collection ||
+      !collection.metadata?.title ||
       collection.metadata.title.trim() == "" ||
+      !collection.metadata?.description ||
       collection.metadata.description.trim() == "" ||
       !collection.metadata.media
     )
@@ -178,51 +245,26 @@ const useCreate = (model: Model | undefined, dict: any) => {
 
     setAddCollectionLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", collection.metadata.media as File);
+      const validated = await validateDraft(collection);
+      if (!validated) {
+        setAddCollectionLoading(false);
+        return;
+      }
 
-      const responseImage = await fetch("/api/ipfs", {
-        method: "POST",
-        body: formData,
-      });
+      const wallet = await ensureLensWallet();
+      const params = await uploadCollection(collection, validated);
 
-      const resImage = await responseImage.json();
-
-      const response = await fetch("/api/ipfs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: collection.metadata.title,
-          description: collection.metadata.description,
-          mediaType: collection.metadata.media.type,
-          media: "ipfs://" + resImage.hash,
-          model: collection.metadata.model,
-          prompt: collection.metadata.prompt,
-          workflow: collection.metadata.workflow,
-        }),
-      });
-
-      const result = await response.json();
-
-      const hash = await walletClient.writeContract({
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "addCollection",
-        args: [
-          dropId,
-          {
-            edition: collection.amount,
-            price: collection.price * 10 ** 18,
-            uri: "ipfs://" + result.hash,
-          },
-        ],
+        args: [BigInt(dropId), params],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.addCollectionSuccess, hash);
-      setCollection(undefined)
+      setCollection(undefined);
     } catch (err: any) {
       console.error(err.message);
       context?.showError(dict?.addCollectionError);
@@ -232,7 +274,6 @@ const useCreate = (model: Model | undefined, dict: any) => {
 
   const handleDeleteCollection = async (collection: Collection) => {
     if (
-      !walletClient ||
       !address ||
       !model ||
       !publicClient ||
@@ -243,13 +284,15 @@ const useCreate = (model: Model | undefined, dict: any) => {
     const collectionId = Number(collection.collectionId);
     setDeleteCollectionLoading(collectionId);
     try {
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "deleteCollection",
-        args: [collectionId],
+        args: [BigInt(collectionId)],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.deleteCollectionSuccess, hash);
     } catch (err: any) {
@@ -260,16 +303,18 @@ const useCreate = (model: Model | undefined, dict: any) => {
   };
 
   const handleDeleteDrop = async (dropId: number) => {
-    if (!walletClient || !address || !model || !publicClient) return;
+    if (!address || !model || !publicClient) return;
     setDeleteDropLoading(dropId);
     try {
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "deleteDrop",
-        args: [dropId],
+        args: [BigInt(dropId)],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.deleteDropSuccess, hash);
     } catch (err: any) {
@@ -283,16 +328,18 @@ const useCreate = (model: Model | undefined, dict: any) => {
     collectionId: number,
     newDropId: number
   ) => {
-    if (!walletClient || !address || !model || !publicClient) return;
+    if (!address || !model || !publicClient) return;
     setReassignLoading(true);
     try {
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "reassignCollection",
-        args: [collectionId, newDropId],
+        args: [BigInt(collectionId), BigInt(newDropId)],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.reassignCollectionSuccess, hash);
     } catch (err: any) {
@@ -319,6 +366,8 @@ const useCreate = (model: Model | undefined, dict: any) => {
     setDrop,
     collection,
     setCollection,
+    designers,
+    designersLoading,
   };
 };
 

@@ -1,9 +1,8 @@
 import { useContext, useState } from "react";
-import {
-  usePublicClient,
-  useWalletClient,
-  useAccount as useAccountWagmi,
-} from "wagmi";
+import { usePublicClient, useAccount as useAccountWagmi } from "wagmi";
+import { isAddress } from "viem";
+import uploadIpfs from "@/app/lib/helpers/uploadIpfs";
+import useLensChain from "../../Common/hooks/useLensChain";
 import { ModelData } from "../types/account.types";
 import { ModalContext } from "@/app/providers";
 import { getCoreContractAddresses, getCurrentNetwork } from "@/app/lib/constants";
@@ -18,7 +17,7 @@ const useAccount = (
   const { address } = useAccountWagmi();
   const publicClient = usePublicClient();
   const context = useContext(ModalContext);
-  const { data: walletClient } = useWalletClient();
+  const { ensureLensWallet } = useLensChain();
   const [registerLoading, setRegisterLoading] = useState<boolean>(false);
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
   const [transferLoading, setTransferLoading] = useState<boolean>(false);
@@ -35,10 +34,29 @@ const useAccount = (
     }
   );
 
+  const uploadProfile = async (): Promise<string> => {
+    const image =
+      typeof modelData?.image !== "string"
+        ? await uploadIpfs(modelData?.image as File)
+        : modelData?.image;
+
+    const cover =
+      typeof modelData?.cover !== "string"
+        ? await uploadIpfs(modelData?.cover as File)
+        : modelData?.cover;
+
+    return await uploadIpfs({
+      title: modelData.title,
+      image,
+      cover,
+      link: modelData.link,
+      description: modelData.description,
+    });
+  };
+
   const handleRegister = async () => {
     if (
       !address ||
-      !walletClient ||
       !publicClient ||
       model ||
       !verified ||
@@ -51,57 +69,17 @@ const useAccount = (
       return;
     setRegisterLoading(true);
     try {
-      let image = modelData?.image;
-      if (typeof modelData?.image !== "string") {
-        const formData = new FormData();
-        formData.append("file", modelData?.image as File);
+      const wallet = await ensureLensWallet();
+      const uri = await uploadProfile();
 
-        const responseImage = await fetch("/api/ipfs", {
-          method: "POST",
-          body: formData,
-        });
-
-        const resImage = await responseImage.json();
-        image = "ipfs://" + resImage.hash;
-      }
-
-      let cover = modelData?.cover;
-      if (typeof modelData?.cover !== "string") {
-        const formData = new FormData();
-        formData.append("file", modelData?.cover as File);
-
-        const responseImage = await fetch("/api/ipfs", {
-          method: "POST",
-          body: formData,
-        });
-
-        const resImage = await responseImage.json();
-        cover = "ipfs://" + resImage.hash;
-      }
-
-      const response = await fetch("/api/ipfs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: modelData.title,
-          image,
-          cover,
-          link: modelData.link,
-          description: modelData.description,
-        }),
-      });
-
-      const result = await response.json();
-
-      const hash = await walletClient.writeContract({
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "registerModel",
-        args: ["ipfs://" + result.hash],
+        args: [uri],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.registerSuccess, hash);
     } catch (err: any) {
@@ -114,7 +92,6 @@ const useAccount = (
   const handleUpdate = async () => {
     if (
       !address ||
-      !walletClient ||
       !publicClient ||
       !model ||
       !verified ||
@@ -127,57 +104,17 @@ const useAccount = (
       return;
     setUpdateLoading(true);
     try {
-      let image = modelData?.image;
-      if (typeof modelData?.image !== "string") {
-        const formData = new FormData();
-        formData.append("file", modelData?.image as File);
+      const wallet = await ensureLensWallet();
+      const uri = await uploadProfile();
 
-        const responseImage = await fetch("/api/ipfs", {
-          method: "POST",
-          body: formData,
-        });
-
-        const resImage = await responseImage.json();
-        image = "ipfs://" + resImage.hash;
-      }
-
-      let cover = modelData?.cover;
-      if (typeof modelData?.cover !== "string") {
-        const formData = new FormData();
-        formData.append("file", modelData?.cover as File);
-
-        const responseImage = await fetch("/api/ipfs", {
-          method: "POST",
-          body: formData,
-        });
-
-        const resImage = await responseImage.json();
-        cover = "ipfs://" + resImage.hash;
-      }
-
-      const response = await fetch("/api/ipfs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: modelData.title,
-          image,
-          cover,
-          link: modelData.link,
-          description: modelData.description,
-        }),
-      });
-
-      const result = await response.json();
-
-      const hash = await walletClient.writeContract({
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "updateModel",
-        args: ["ipfs://" + result.hash],
+        args: [uri],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.updateSuccess, hash);
     } catch (err: any) {
@@ -190,7 +127,6 @@ const useAccount = (
   const transferWallet = async () => {
     if (
       !address ||
-      !walletClient ||
       !publicClient ||
       !model ||
       !verified ||
@@ -200,13 +136,20 @@ const useAccount = (
 
     setTransferLoading(true);
     try {
-      const hash = await walletClient.writeContract({
+      const newWallet = (modelData?.transferWallet ?? "").trim();
+      if (!isAddress(newWallet)) {
+        throw new Error("Invalid wallet address");
+      }
+
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "transferModel",
-        args: [modelData?.transferWallet],
+        args: [newWallet],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.transferWallet, hash);
     } catch (err: any) {
@@ -219,7 +162,6 @@ const useAccount = (
   const handleDelete = async () => {
     if (
       !address ||
-      !walletClient ||
       !publicClient ||
       !model ||
       !verified ||
@@ -228,13 +170,15 @@ const useAccount = (
       return;
     setDeleteLoading(true);
     try {
-      const hash = await walletClient.writeContract({
+      const wallet = await ensureLensWallet();
+      const { request } = await publicClient.simulateContract({
         address: contracts.models,
         abi: ABIS.GMSModels,
         functionName: "deleteModel",
         args: [],
         account: address,
       });
+      const hash = await wallet.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
       context?.showSuccess(dict?.deleteSuccess, hash);
     } catch (err: any) {

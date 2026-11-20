@@ -5,6 +5,7 @@ import { ModalContext } from "@/app/providers";
 import Cart from "./Cart";
 import Success from "./Success";
 import Error from "./Error";
+import Notice from "./Notice";
 
 export const Modals = ({ dict }: { dict: any }) => {
   const context = useContext(ModalContext);
@@ -16,6 +17,7 @@ export const Modals = ({ dict }: { dict: any }) => {
       {context.cartOpen && <Cart dict={dict} />}
       {context.successData && <Success dict={dict} />}
       {context.errorData && <Error dict={dict} />}
+      {context.noticeOpen && <Notice dict={dict} />}
     </>
   );
 };

@@ -7,6 +7,7 @@ import { chains } from "@lens-chain/sdk/viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorData, SuccessData } from "./components/Modals/types/modals.types";
 import { getCurrentNetwork } from "./lib/constants";
+import useNotice from "./components/Modals/hooks/useNotice";
 import { Collection } from "./components/Model/types/model.types";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,8 @@ export const ModalContext = createContext<
       hideError: () => void;
       successData: SuccessData | null;
       errorData: ErrorData | null;
+      noticeOpen: boolean;
+      hideNotice: () => void;
       cartItems: CartItem[];
       addToCart: (collection: Collection, amount: number) => void;
       removeFromCart: (collectionId: string) => void;
@@ -55,7 +58,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     setSuccessData({ message, txHash });
   };
 
+  const { noticeOpen, hideNotice, wasJustBlocked } = useNotice();
+
   const showError = (message: string) => {
+    if (wasJustBlocked(message)) return;
     setErrorData({ message });
   };
 
@@ -123,6 +129,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               hideError,
               successData,
               errorData,
+              noticeOpen,
+              hideNotice,
               cartItems,
               addToCart,
               removeFromCart,
